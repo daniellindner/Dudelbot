@@ -1,5 +1,5 @@
 //MIDI Signal to Signal for MOSFET
-//Daniel Lindner
+//Daniel, Amal, Hazem
 
 
 #include <MIDI.h>
