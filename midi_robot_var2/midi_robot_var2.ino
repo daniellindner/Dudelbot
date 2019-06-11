@@ -19,8 +19,8 @@
 #define stopButton 43
 #define compressorButton 45
 #define redLED 37
-#define greenLED 35
-#define blueLED 53
+#define greenLED 53
+#define blueLED 35
 
 /*
   top is by mouthpiece
@@ -59,7 +59,11 @@ void setup()
   pinMode(t7, OUTPUT);
   pinMode(t8, OUTPUT);
   pinMode(t9, OUTPUT);
-
+  pinMode(tCompressor, OUTPUT);
+  pinMode(redLED, OUTPUT);
+  pinMode(greenLED, OUTPUT);
+  pinMode(blueLED, OUTPUT);
+  
   count = 0; //debug
 
   //Setup Start/Stop Button
@@ -86,7 +90,10 @@ void loop()
   updateButtons();
   updateLED();
   debug();
+  
   digitalWrite(tCompressor, compressorState); //Start Stop Compressor
+  
+  
   if (onState) {
 
     MIDI.read();
@@ -102,7 +109,8 @@ void onNoteOn(byte channel, byte pitch, byte velocity)
   /*if (channel != selectedChannel) {
     return; //Filter for right channel
     }*/
-
+  pitch += 1;
+   
   switch (pitch) {
     case 55:
     case 56: playLowG(); break;
@@ -163,12 +171,12 @@ void updateButtons() {
   debounceCompressor.update();
 
   if (debounceStart.fell()) {
-    onState = !onState;
+    onState = true;
     Serial.print("onState:\t");
     Serial.println(onState);
   }
   if (debounceStop.fell()) {
-    onState = !onState;
+    onState = false;
     Serial.print("onState:\t");
     Serial.println(onState);
   }
