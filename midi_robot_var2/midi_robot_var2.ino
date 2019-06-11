@@ -3,19 +3,24 @@
 
 
 #include <MIDI.h>
+#include <Bounce2.h>
 
 #define selectedChannel 1
-#define t2 53
-#define t3 51
-#define t4 49
-#define t5 47
-#define t6 45
-#define t7 43
-#define t8 41
-#define t9 39
-#define startButtonInterrupt 3
-
-volatile bool onState;
+#define tCompressor 29
+#define t2 23
+#define t3 38
+#define t4 40
+#define t5 42
+#define t6 44
+#define t7 46
+#define t8 48
+#define t9 50
+#define startButton 41
+#define stopButton 43
+#define compressorButton 45
+#define redLED 37
+#define greenLED 35
+#define blueLED 53
 
 /*
   top is by mouthpiece
@@ -26,7 +31,17 @@ volatile bool onState;
    t5 ...
 */
 
+bool onState;
+bool compressorState;
+int count; //debug
+
+
+
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
+
+Bounce debounceStart = Bounce();
+Bounce debounceStop = Bounce();
+Bounce debounceCompressor = Bounce();
 
 void setup()
 {
@@ -45,29 +60,39 @@ void setup()
   pinMode(t8, OUTPUT);
   pinMode(t9, OUTPUT);
 
+  count = 0; //debug
+
   //Setup Start/Stop Button
   onState = false;
-  pinMode(startButtonInterrupt, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(startButtonInterrupt), toggleStart, FALLING);
+  compressorState = false;
+  pinMode(startButton, INPUT_PULLUP);
+  debounceStart.attach(startButton);
+  debounceStart.interval(5);
+  pinMode(stopButton, INPUT_PULLUP);
+  debounceStop.attach(stopButton);
+  debounceStop.interval(5);
+  pinMode(compressorButton, INPUT_PULLUP);
+  debounceCompressor.attach(compressorButton);
+  debounceCompressor.interval(5);
 
   //Setup debug
   Serial.begin(115200);
-
-  waitForStart();
-
-
+  while (!Serial) {}
+  Serial.println("Dudelbot");
 }
 
 void loop()
 {
-
+  updateButtons();
+  updateLED();
+  debug();
+  digitalWrite(tCompressor, compressorState); //Start Stop Compressor
   if (onState) {
 
     MIDI.read();
     //Serial.println("Active");
   } else {
     stopPlay();
-    waitForStart();
   }
 }
 
@@ -120,20 +145,62 @@ void onNoteOff(byte channel, byte pitch, byte velocity) {
   stopPlay();
 }
 
-void toggleStart() {
-  static unsigned long last_interrupt_time = 0;
-  unsigned long interrupt_time = millis();
-  if (interrupt_time - last_interrupt_time > 300) {
-    onState = !onState;
-    Serial.println("Start/Stop pressed.");
-  }
+void debug() {
+  static long last_debug = 0;
+  long now = millis();
 
-  last_interrupt_time = interrupt_time;
+  Serial.print("OnState\t");
+  Serial.println(onState);
+  Serial.print("CompressorState\t");
+  Serial.println(compressorState);
+
 }
 
-void waitForStart() {
-  Serial.println("Press StartButton to begin.");
-  while (!onState) {}
+void updateButtons() {
+  //check for pressed Buttons
+  debounceStart.update();
+  debounceStop.update();
+  debounceCompressor.update();
+
+  if (debounceStart.fell()) {
+    onState = !onState;
+    Serial.print("onState:\t");
+    Serial.println(onState);
+  }
+  if (debounceStop.fell()) {
+    onState = !onState;
+    Serial.print("onState:\t");
+    Serial.println(onState);
+  }
+  if (debounceCompressor.fell()) {
+    compressorState = !compressorState;
+    Serial.print("CompressorState:\t");
+    Serial.println(compressorState);
+  }
+}
+
+void updateLED() {
+  //update Status LED
+  // RED = off
+  // BLUE = compressor active
+  // green = on
+  digitalWrite(redLED, LOW);
+  digitalWrite(greenLED, LOW);
+  digitalWrite(blueLED, LOW);
+
+  if (onState) {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greenLED, HIGH);
+    digitalWrite(blueLED, LOW);
+  } else if (compressorState) {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greenLED, LOW);
+    digitalWrite(blueLED, HIGH);
+  } else {
+    digitalWrite(redLED, HIGH);
+    digitalWrite(greenLED, LOW);
+    digitalWrite(blueLED, LOW);
+  }
 }
 
 void playLowG()
@@ -386,5 +453,5 @@ void stopPlay()
   digitalWrite(t8, LOW);
   digitalWrite(t9, LOW);
 
-  Serial.println("Stopped.");
+  //Serial.println("Stopped.");
 }
