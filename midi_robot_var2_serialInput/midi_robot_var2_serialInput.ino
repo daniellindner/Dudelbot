@@ -1,20 +1,18 @@
 //MIDI Signal to Signal for MOSFET
 //Daniel, Amal, Hazem
 
-
-#include <MIDI.h>
 #include <Bounce2.h>
 
 #define selectedChannel 1
 #define tCompressor 29
-#define t2 23
-#define t3 38
-#define t4 40
-#define t5 42
-#define t6 44
-#define t7 46
-#define t8 48
-#define t9 50
+#define t2 50
+#define t3 48
+#define t4 46
+#define t5 44
+#define t6 42
+#define t7 40
+#define t8 38
+#define t9 23
 #define startButton 41
 #define stopButton 43
 #define compressorButton 45
@@ -35,20 +33,13 @@ bool onState;
 bool compressorState;
 int count; //debug
 
-
-
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
-
 Bounce debounceStart = Bounce();
 Bounce debounceStop = Bounce();
 Bounce debounceCompressor = Bounce();
 
 void setup()
 {
-  //Setup MIDI
-  MIDI.setHandleNoteOn(onNoteOn);
-  MIDI.setHandleNoteOff(onNoteOff);
-  MIDI.begin(MIDI_CHANNEL_OMNI);
+
 
   //Setup Solenoids
   pinMode(t2, OUTPUT);
@@ -64,11 +55,6 @@ void setup()
   pinMode(greenLED, OUTPUT);
   pinMode(blueLED, OUTPUT);
 
-  count = 0; //debug
-
-  //Setup Start/Stop/Compressor Button
-  onState = false;
-  compressorState = false;
   pinMode(startButton, INPUT_PULLUP);
   debounceStart.attach(startButton);
   debounceStart.interval(5);
@@ -78,39 +64,91 @@ void setup()
   pinMode(compressorButton, INPUT_PULLUP);
   debounceCompressor.attach(compressorButton);
   debounceCompressor.interval(5);
+  count = 0; //debug
 
+  //Setup Start/Stop/Compressor Button
+  onState = true;
+  compressorState = true;
   //Setup debug
   Serial.begin(115200);
   while (!Serial) {}
   Serial.println("Dudelbot");
-  Serial.println("Press Start to Play.");
 }
 
 void loop()
 {
   updateButtons();
   updateLED();
-  //debug();
-
-  digitalWrite(tCompressor, compressorState); //Start Stop Compressor
-
-
-  if (onState) {
-
-    MIDI.read();
-    //Serial.println("Active");
-  } else {
-    stopPlay();
+  digitalWrite(tCompressor, compressorState);
+  if (Serial.available()) {
+    char pitch = Serial.read();
+    if (pitch == 48) {
+      onNoteOff();
+    }
+    else if (pitch != 0) {
+      onNoteOff();
+      onNoteOn(pitch);
+    } else {
+      onNoteOff();
+    }
   }
 }
 
-void onNoteOn(byte channel, byte pitch, byte velocity)
+void updateLED() {
+  //update Status LED
+  // RED = off
+  // BLUE = compressor active
+  // green = on
+  digitalWrite(redLED, LOW);
+  digitalWrite(greenLED, LOW);
+  digitalWrite(blueLED, LOW);
+
+  if (onState) {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greenLED, HIGH);
+    digitalWrite(blueLED, LOW);
+  } else if (compressorState) {
+    digitalWrite(redLED, LOW);
+    digitalWrite(greenLED, LOW);
+    digitalWrite(blueLED, HIGH);
+  } else {
+    digitalWrite(redLED, HIGH);
+    digitalWrite(greenLED, LOW);
+    digitalWrite(blueLED, LOW);
+  }
+}
+
+void updateButtons() {
+  //check for pressed Buttons
+  debounceStart.update();
+  debounceStop.update();
+  debounceCompressor.update();
+
+  if (debounceStart.fell()) {
+    onState = true;
+    Serial.print("onState:\t");
+    Serial.println(onState);
+  }
+  if (debounceStop.fell()) {
+    onState = false;
+    compressorState = false;
+    Serial.print("onState:\t");
+    Serial.println(onState);
+  }
+  if (debounceCompressor.fell()) {
+    compressorState = !compressorState;
+    Serial.print("CompressorState:\t");
+    Serial.println(compressorState);
+  }
+}
+
+void onNoteOn(byte pitch)
 {
   //Act on Note recieved
   /*if (channel != selectedChannel) {
     return; //Filter for right channel
     }*/
-  pitch += 1;
+  //pitch += 1;
 
   switch (pitch) {
     case 55:
@@ -145,11 +183,8 @@ void onNoteOn(byte channel, byte pitch, byte velocity)
   //Serial.print("Channel: "); Serial.println(channel);
 }
 
-void onNoteOff(byte channel, byte pitch, byte velocity) {
+void onNoteOff() {
   // Act on Note released
-  if (channel != selectedChannel) {
-    return;
-  }
 
   stopPlay();
 }
@@ -158,60 +193,15 @@ void debug() {
   static long last_debug = 0;
   long now = millis();
 
-  Serial.print("OnState\t");
-  Serial.println(onState);
-  Serial.print("CompressorState\t");
-  Serial.println(compressorState);
-
-}
-
-void updateButtons() {
-  //check for pressed Buttons
-  debounceStart.update();
-  debounceStop.update();
-  debounceCompressor.update();
-
-  if (debounceStart.fell()) {
-    onState = true;
-    Serial.print("onState:\t");
+  if (now - last_debug > 200) {
+    Serial.print("OnState\t");
     Serial.println(onState);
-  }
-  if (debounceStop.fell()) {
-    onState = false;
-    compressorState = false;
-    Serial.print("onState:\t");
-    Serial.println(onState);
-  }
-  if (debounceCompressor.fell()) {
-    compressorState = !compressorState;
-    Serial.print("CompressorState:\t");
+    Serial.print("CompressorState\t");
     Serial.println(compressorState);
+    last_debug = now;
   }
 }
 
-void updateLED() {
-  //update Status LED
-  // RED = off
-  // BLUE = compressor active
-  // green = on
-  digitalWrite(redLED, LOW);
-  digitalWrite(greenLED, LOW);
-  digitalWrite(blueLED, LOW);
-
-  if (onState) {
-    digitalWrite(redLED, LOW);
-    digitalWrite(greenLED, HIGH);
-    digitalWrite(blueLED, LOW);
-  } else if (compressorState) {
-    digitalWrite(redLED, LOW);
-    digitalWrite(greenLED, LOW);
-    digitalWrite(blueLED, HIGH);
-  } else {
-    digitalWrite(redLED, HIGH);
-    digitalWrite(greenLED, LOW);
-    digitalWrite(blueLED, LOW);
-  }
-}
 
 void playLowG()
 {
