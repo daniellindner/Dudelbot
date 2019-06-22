@@ -4,6 +4,7 @@
 
 #include <MIDI.h>
 #include <Bounce2.h>
+#include <Servo.h>
 
 #define selectedChannel 1
 #define tCompressor 29
@@ -21,7 +22,11 @@
 #define redLED 37
 #define greenLED 53
 #define blueLED 35
-
+//Servo Settings
+#define servoPin 15
+#define servoClosed 0
+#define servoOpen 100
+//ServoSettings
 /*
   top is by mouthpiece
 
@@ -36,12 +41,13 @@ bool compressorState;
 int count; //debug
 
 
-
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, MIDI);
 
 Bounce debounceStart = Bounce();
 Bounce debounceStop = Bounce();
 Bounce debounceCompressor = Bounce();
+
+Servo ventilServo;
 
 void setup()
 {
@@ -79,6 +85,8 @@ void setup()
   debounceCompressor.attach(compressorButton);
   debounceCompressor.interval(5);
 
+  ventilServo.attach(servoPin);
+
   //Setup debug
   Serial.begin(115200);
   while (!Serial) {}
@@ -90,6 +98,7 @@ void loop()
 {
   updateButtons();
   updateLED();
+  updateServo();
   //debug();
 
   digitalWrite(tCompressor, compressorState); //Start Stop Compressor
@@ -106,7 +115,8 @@ void onNoteOn(byte channel, byte pitch, byte velocity)
   /*if (channel != selectedChannel) {
     return; //Filter for right channel
     }*/
-  if(!onState){
+  if (!onState) {
+    Serial.println("Green Button to Start Play.");
     return;
   }
   pitch += 1;
@@ -147,9 +157,9 @@ void onNoteOn(byte channel, byte pitch, byte velocity)
 void onNoteOff(byte channel, byte pitch, byte velocity) {
   // Act on Note released
   /*
-  if (channel != selectedChannel) {
+    if (channel != selectedChannel) {
     return;
-  }
+    }
   */
 
   stopPlay();
@@ -214,6 +224,24 @@ void updateLED() {
   }
 }
 
+
+void updateServo() {
+  /*
+     compressorState  onState Servo
+          0              0    open
+          0              1    open
+          1              0    closed
+          1              1    open
+
+      ServoClosed: Ventil ist abgeschlossen
+      ServoOpen: Ventil ist geöffnet
+  */
+  if (compressorState && !onState) {
+    ventilServo.write(servoClosed);
+  } else {
+    ventilServo.write(servoOpen);
+  }
+}
 void playLowG()
 {
   digitalWrite(t2 , LOW);
@@ -464,5 +492,5 @@ void stopPlay()
   digitalWrite(t8, HIGH);
   digitalWrite(t9, HIGH);
 
-  Serial.println("Stopped.");
+  //Serial.println("Stopped.");
 }
